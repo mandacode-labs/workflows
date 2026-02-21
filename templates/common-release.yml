@@ -15,6 +15,10 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
@@ -30,6 +34,7 @@ jobs:
         [
           {"name": "myapp", "dockerfile": "Dockerfile"}
         ]
+      base-path: ""
       registry: ghcr.io
       repository: ${{ github.repository }}
       tag: ${{ github.ref_name }}
@@ -50,6 +55,7 @@ jobs:
         [
           {"dir": "charts/myapp"}
         ]
+      base-path: ""
       registry: ghcr.io
       repository: ${{ github.repository }}
       helm-version: "v4.0.4"

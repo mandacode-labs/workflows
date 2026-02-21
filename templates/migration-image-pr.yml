@@ -6,7 +6,7 @@
 # Usage:
 #   1. Copy this file to your project's .github/workflows/migration-pr.yml
 #   2. Update the paths filter to match your migration directory structure
-#   3. Update the dockerfile path to match your migration Dockerfile location
+#   3. Update the BASE_PATH and dockerfile path to match your project structure
 
 name: Migration Image PR
 
@@ -16,14 +16,17 @@ on:
       - main
       - develop
     paths:
-      - 'migrations/**'
-      - 'docker/migration/**'
-      - 'db/migrations/**'
+      - "migrations/**"
+      - "docker/migration/**"
+      - "db/migrations/**"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
-  pull-requests: read
   security-events: write
 
 jobs:
@@ -37,6 +40,7 @@ jobs:
         [
           {"dockerfile": "docker/migration/Dockerfile", "context": "."}
         ]
+      base-path: ""
       enable-hadolint: true
       enable-trivy: true
       trivy-severity: "HIGH,CRITICAL"

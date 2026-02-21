@@ -15,7 +15,11 @@ name: Migration Image Release
 on:
   push:
     tags:
-      - 'migration-v*'
+      - "migration-v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -30,6 +34,7 @@ jobs:
         [
           {"name": "migration", "dockerfile": "docker/migration/Dockerfile", "context": "."}
         ]
+      base-path: ""
       aws-region: ap-northeast-2
       ecr-repository-prefix: mycompany
       tag: ${{ github.ref_name }}

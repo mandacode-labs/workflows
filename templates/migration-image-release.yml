@@ -13,7 +13,11 @@ name: Migration Image Release
 on:
   push:
     tags:
-      - 'migration-v*'
+      - "migration-v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -30,6 +34,7 @@ jobs:
         [
           {"name": "migration", "dockerfile": "docker/migration/Dockerfile", "context": "."}
         ]
+      base-path: ""
       registry: ghcr.io
       repository: ${{ github.repository }}
       tag: ${{ github.ref_name }}

@@ -16,9 +16,12 @@ on:
       - main
       - develop
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
-  pull-requests: read
   security-events: write
 
 jobs:
@@ -40,6 +43,7 @@ jobs:
         [
           {"dockerfile": "Dockerfile"}
         ]
+      base-path: ""
       enable-hadolint: true
       enable-trivy: true
       trivy-severity: "HIGH,CRITICAL"
@@ -52,6 +56,7 @@ jobs:
         [
           {"dir": "charts/myapp"}
         ]
+      base-path: ""
       helm-version: "v4.0.4"
       kubernetes-version: "v1.31.0"
       enable-kubeconform: true
