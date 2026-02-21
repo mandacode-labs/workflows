@@ -1,0 +1,358 @@
+name: NestJS CI
+
+# Reusable workflow for NestJS continuous integration
+# Includes: build, test with coverage, lint (ESLint, Prettier), type check, and security scanning
+#
+# Usage example:
+#   jobs:
+#     nest-ci:
+#       uses: mandacode-lab/workflows/.github/workflows/nest-ci.yml@main
+#       with:
+#         node-version: "22"
+#         enable-coverage: true
+#         coverage-threshold: 80
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: "Node.js version to use"
+        required: false
+        type: string
+        default: "22"
+      node-version-file:
+        description: "Path to .nvmrc or .node-version file (takes precedence over node-version)"
+        required: false
+        type: string
+        default: ""
+      working-directory:
+        description: "Working directory (for monorepo)"
+        required: false
+        type: string
+        default: "."
+      enable-coverage:
+        description: "Enable coverage report"
+        required: false
+        type: boolean
+        default: true
+      coverage-threshold:
+        description: "Minimum coverage percentage (0 = no threshold)"
+        required: false
+        type: number
+        default: 0
+      enable-codecov:
+        description: "Upload coverage to Codecov"
+        required: false
+        type: boolean
+        default: false
+      codecov-token:
+        description: "Codecov token (if required)"
+        required: false
+        type: string
+        default: ""
+      enable-lint:
+        description: "Enable linting (ESLint)"
+        required: false
+        type: boolean
+        default: true
+      enable-format-check:
+        description: "Enable format checking (Prettier)"
+        required: false
+        type: boolean
+        default: true
+      enable-type-check:
+        description: "Enable TypeScript type checking"
+        required: false
+        type: boolean
+        default: true
+      enable-security-scan:
+        description: "Enable security scanning (npm audit, Snyk)"
+        required: false
+        type: boolean
+        default: true
+      enable-snyk:
+        description: "Enable Snyk security scan"
+        required: false
+        type: boolean
+        default: false
+      snyk-token:
+        description: "Snyk token for authentication"
+        required: false
+        type: string
+        default: ""
+      test-flags:
+        description: "Additional Jest flags (e.g., --maxWorkers=2)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+  actions: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: |
+          echo "🔨 Building NestJS application..."
+          npm run build
+          echo "✅ Build successful"
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: |
+          echo "🧪 Running tests..."
+          if [ "${{ inputs.enable-coverage }}" = "true" ]; then
+            npm run test:cov ${{ inputs.test-flags }}
+          else
+            npm run test ${{ inputs.test-flags }}
+          fi
+
+      - name: Generate coverage summary
+        if: inputs.enable-coverage
+        run: |
+          echo "📊 Coverage Summary:"
+          if [ -f coverage/coverage-summary.json ]; then
+            cat coverage/coverage-summary.json | jq '.total'
+          fi
+
+      - name: Check coverage threshold
+        if: inputs.enable-coverage && inputs.coverage-threshold > 0
+        run: |
+          THRESHOLD="${{ inputs.coverage-threshold }}"
+
+          if [ -f coverage/coverage-summary.json ]; then
+            COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+            echo "Total coverage: ${COVERAGE}%"
+
+            if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+              echo "❌ Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
+              exit 1
+            else
+              echo "✅ Coverage ${COVERAGE}% meets threshold ${THRESHOLD}%"
+            fi
+          else
+            echo "⚠️ coverage-summary.json not found, skipping threshold check"
+          fi
+
+      - name: Upload coverage to Codecov
+        if: inputs.enable-coverage && inputs.enable-codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ inputs.codecov-token }}
+          files: ./coverage/lcov.info
+          flags: unittests
+          fail_ci_if_error: false
+          working-directory: ${{ inputs.working-directory }}
+
+      - name: Upload coverage artifact
+        if: inputs.enable-coverage
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-report
+          path: ${{ inputs.working-directory }}/coverage
+          retention-days: 7
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          {
+            echo "### 🧪 Test Results"
+            echo ""
+            if [ "${{ job.status }}" = "success" ]; then
+              echo "**Status:** ✅ All tests passed"
+            else
+              echo "**Status:** ❌ Tests failed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: inputs.enable-lint
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: |
+          echo "🔍 Running ESLint..."
+          npx eslint "{src,apps,libs,test}/**/*.ts"
+          echo "✅ Linting successful"
+
+  format:
+    name: Format Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: inputs.enable-format-check
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Prettier check
+        run: |
+          echo "🎨 Checking code formatting..."
+          npx prettier --check "src/**/*.ts" "test/**/*.ts"
+          echo "✅ Format check passed"
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: inputs.enable-type-check
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript type check
+        run: |
+          echo "🔍 Running TypeScript type check..."
+          npx tsc --noEmit
+          echo "✅ Type check passed"
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: inputs.enable-security-scan
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: |
+          echo "🔒 Running npm audit..."
+          npm audit --audit-level=high
+          echo "✅ Audit complete"
+        continue-on-error: true
+
+      - name: Run Snyk security scan
+        if: inputs.enable-snyk
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ inputs.snyk-token }}
+        with:
+          args: --severity-threshold=high --sarif-file-output=snyk-results.sarif
+          working-directory: ${{ inputs.working-directory }}
+        continue-on-error: true
+
+      - name: Upload Snyk results to GitHub Security
+        if: inputs.enable-snyk
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ inputs.working-directory }}/snyk-results.sarif
+          category: snyk
+        continue-on-error: true
+
+      - name: Generate security summary
+        if: always()
+        run: |
+          {
+            echo "### 🔒 Security Scan Results"
+            echo ""
+            echo "**npm audit:** Check for known vulnerabilities"
+            if [ "${{ inputs.enable-snyk }}" = "true" ]; then
+              echo "**Snyk:** Advanced security scanning"
+            fi
+            echo ""
+            if [ "${{ job.status }}" = "success" ]; then
+              echo "**Status:** ✅ No critical security issues found"
+            else
+              echo "**Status:** ⚠️ Security issues detected (check details above)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
