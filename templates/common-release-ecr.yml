@@ -1,6 +1,6 @@
-# Template: Common Go Project - Release (AWS ECR)
+# Template: Common Project - Release (AWS ECR)
 #
-# Complete release workflow for Go projects to AWS ECR
+# Complete release workflow to AWS ECR
 # Includes: Docker build/push to ECR and Helm chart packaging to ECR
 #
 # Usage:
@@ -14,7 +14,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: read

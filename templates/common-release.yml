@@ -1,6 +1,6 @@
-# Template: Common Go Project - Release (GHCR)
+# Template: Common Project - Release (GHCR)
 #
-# Complete release workflow for Go projects to GitHub Container Registry
+# Complete release workflow to GitHub Container Registry
 # Includes: Docker build/push and Helm chart packaging
 #
 # Usage:
@@ -13,7 +13,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: read
