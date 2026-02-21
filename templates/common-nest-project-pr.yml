@@ -1,0 +1,59 @@
+# Template: Common NestJS Project - Pull Request
+#
+# Complete PR validation workflow for NestJS projects with Docker and Helm
+# Includes: NestJS CI, Docker testing, and Helm chart testing
+#
+# Usage:
+#   1. Copy this file to your project's .github/workflows/pr.yml
+#   2. Update configurations below to match your project structure
+#   3. Remove docker-test or helm-test sections if not needed
+
+name: Pull Request
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+
+jobs:
+  nest-ci:
+    name: NestJS CI
+    uses: mandacode-lab/workflows/.github/workflows/nest-ci.yml@main
+    with:
+      node-version: "22"
+      enable-coverage: true
+      coverage-threshold: 80
+      enable-security-scan: true
+
+  docker-test:
+    name: Docker Test
+    needs: nest-ci
+    uses: mandacode-lab/workflows/.github/workflows/docker-test.yml@main
+    with:
+      images: |
+        [
+          {"dockerfile": "Dockerfile"}
+        ]
+      enable-hadolint: true
+      enable-trivy: true
+      trivy-severity: "HIGH,CRITICAL"
+
+  helm-test:
+    name: Helm Test
+    needs: nest-ci
+    uses: mandacode-lab/workflows/.github/workflows/helm-test.yml@main
+    with:
+      charts: |
+        [
+          {"dir": "charts/myapp"}
+        ]
+      helm-version: "v4.0.4"
+      kubernetes-version: "v1.31.0"
+      enable-kubeconform: true
+      enable-install-test: true
