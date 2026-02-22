@@ -68,7 +68,7 @@ jobs:
     name: Test ${{ matrix.images.dockerfile }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: fromJson(inputs.images) != null && fromJson(inputs.images)[0] != null
+    if: ${{ inputs.images != '' }}
     strategy:
       matrix:
         image: ${{ fromJson(inputs.images) }}
