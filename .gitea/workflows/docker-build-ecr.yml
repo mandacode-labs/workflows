@@ -203,6 +203,7 @@ jobs:
           echo "registry=$REGISTRY" >> "$GITEA_OUTPUT"
 
       - name: Set up QEMU
+        if: contains(inputs.platforms, ',')
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
