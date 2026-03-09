@@ -1,6 +1,6 @@
 name: Workflow Lint
 
-# Workflow for validating GitHub Actions workflows
+# Workflow for validating Gitea Actions workflows
 # Automatically runs on workflow changes
 # Includes: actionlint, yamllint, and structure validation
 
@@ -25,7 +25,7 @@ permissions:
 
 jobs:
   actionlint:
-    name: Lint GitHub Actions
+    name: Lint Gitea Actions
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -41,7 +41,7 @@ jobs:
       - name: Install actionlint
         run: |
           go install github.com/rhysd/actionlint/cmd/actionlint@latest
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          echo "$(go env GOPATH)/bin" >> "$GITEA_PATH"
 
       - name: Verify actionlint installation
         run: |
@@ -50,7 +50,7 @@ jobs:
       - name: Run actionlint
         run: |
           echo "🔍 Running actionlint on workflow files..."
-          actionlint -color -verbose
+          actionlint -color -ignore="label 'runs-on' not found" .gitea/workflows/*.yml
           echo "✅ actionlint passed"
 
       - name: Generate actionlint summary
@@ -66,7 +66,7 @@ jobs:
               echo ""
               echo "Please fix the issues reported above."
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITEA_STEP_SUMMARY"
 
   yamllint:
     name: Lint YAML Files
@@ -126,7 +126,7 @@ jobs:
               echo ""
               echo "Please fix the YAML formatting issues reported above."
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITEA_STEP_SUMMARY"
 
   validate-structure:
     name: Validate Structure
@@ -140,7 +140,7 @@ jobs:
         id: count
         run: |
           WORKFLOW_COUNT=$(find .gitea/workflows -name '*.yml' -o -name '*.yaml' | wc -l)
-          echo "count=$WORKFLOW_COUNT" >> "$GITHUB_OUTPUT"
+          echo "count=$WORKFLOW_COUNT" >> "$GITEA_OUTPUT"
           echo "📊 Total workflows: $WORKFLOW_COUNT"
 
       - name: List workflow files
@@ -167,8 +167,8 @@ jobs:
             fi
           done
 
-          echo "reusable-count=${#REUSABLE_WORKFLOWS[@]}" >> "$GITHUB_OUTPUT"
-          echo "caller-count=${#CALLER_WORKFLOWS[@]}" >> "$GITHUB_OUTPUT"
+          echo "reusable-count=${#REUSABLE_WORKFLOWS[@]}" >> "$GITEA_OUTPUT"
+          echo "caller-count=${#CALLER_WORKFLOWS[@]}" >> "$GITEA_OUTPUT"
 
           echo ""
           echo "📦 Reusable workflows (${#REUSABLE_WORKFLOWS[@]}):"
@@ -187,21 +187,21 @@ jobs:
           # Check for set-output (deprecated) - exclude workflow-lint.yml itself
           if grep -r "set-output" .gitea/workflows/ --exclude="workflow-lint.yml" 2>/dev/null; then
             echo "⚠️ Found deprecated 'set-output' command"
-            echo "   Use 'echo \"key=value\" >> \$GITHUB_OUTPUT' instead"
+            echo "   Use 'echo \"key=value\" >> \$GITEA_OUTPUT' instead"
             DEPRECATED_FOUND=true
           fi
 
           # Check for save-state (deprecated) - exclude workflow-lint.yml itself
           if grep -r "save-state" .gitea/workflows/ --exclude="workflow-lint.yml" 2>/dev/null; then
             echo "⚠️ Found deprecated 'save-state' command"
-            echo "   Use 'echo \"key=value\" >> \$GITHUB_STATE' instead"
+            echo "   Use 'echo \"key=value\" >> \$GITEA_STATE' instead"
             DEPRECATED_FOUND=true
           fi
 
           # Check for add-path (deprecated) - exclude workflow-lint.yml itself
           if grep -r "add-path" .gitea/workflows/ --exclude="workflow-lint.yml" 2>/dev/null; then
             echo "⚠️ Found deprecated 'add-path' command"
-            echo "   Use 'echo \"path\" >> \$GITHUB_PATH' instead"
+            echo "   Use 'echo \"path\" >> \$GITEA_PATH' instead"
             DEPRECATED_FOUND=true
           fi
 
@@ -229,7 +229,7 @@ jobs:
             else
               echo "**Status:** ❌ Structure validation failed"
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITEA_STEP_SUMMARY"
 
   summary:
     name: Validation Summary
@@ -270,7 +270,7 @@ jobs:
             else
               echo "⚠️ **Some validation checks failed. Please review the errors above.**"
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITEA_STEP_SUMMARY"
 
       - name: Check overall status
         run: |

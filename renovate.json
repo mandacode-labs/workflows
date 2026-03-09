@@ -1,0 +1,135 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "description": "Renovate configuration for Gitea Actions workflows",
+  "enabledManagers": [
+    "github-actions",
+    "dockerfile",
+    "helm-values",
+    "regex"
+  ],
+  "fileMatches": [
+    "\\.gitea/workflows/.+\\.ya?ml$",
+    "templates/.+\\.ya?ml$"
+  ],
+  "labels": [
+    "dependencies",
+    "renovate"
+  ],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rebaseWhen": "conflicted",
+  "schedule": [
+    "before 9am on Monday"
+  ],
+  "timezone": "Asia/Seoul",
+  "packageRules": [
+    {
+      "description": "Group all GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions",
+      "pinDigests": true,
+      "commitMessagePrefix": "ci(actions):"
+    },
+    {
+      "description": "Pin and update Docker images",
+      "matchManagers": ["dockerfile"],
+      "pinDigests": true,
+      "commitMessagePrefix": "ci(docker):"
+    },
+    {
+      "description": "Group Helm-related updates",
+      "matchManagers": ["helm-values"],
+      "groupName": "Helm Charts",
+      "groupSlug": "helm",
+      "commitMessagePrefix": "ci(helm):"
+    },
+    {
+      "description": "Update action versions in templates",
+      "matchManagers": ["regex"],
+      "groupName": "Action Versions in Templates",
+      "groupSlug": "template-actions",
+      "commitMessagePrefix": "ci(templates):"
+    },
+    {
+      "description": "Auto-merge patch updates for dev dependencies",
+      "matchUpdateTypes": ["patch"],
+      "matchDepTypes": ["devDependencies"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Require approval for major updates",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    }
+  ],
+  "regexManagers": [
+    {
+      "description": "Update Go version in workflows",
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "matchStrings": [
+        "go-version:\\s*[\"']?(?<currentValue>[\\d.]+)[\"']?"
+      ],
+      "depNameTemplate": "golang",
+      "datasourceTemplate": "golang-version"
+    },
+    {
+      "description": "Update Helm version in workflows",
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "matchStrings": [
+        "helm-version:\\s*[\"']?v?(?<currentValue>[\\d.]+)[\"']?"
+      ],
+      "depNameTemplate": "helm/helm",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "description": "Update Kubernetes version in workflows",
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "matchStrings": [
+        "kubernetes-version:\\s*[\"']?v?(?<currentValue>[\\d.]+)[\"']?"
+      ],
+      "depNameTemplate": "kubernetes/kubernetes",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "description": "Update golangci-lint version",
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "matchStrings": [
+        "lint-version:\\s*[\"']?v?(?<currentValue>[\\d.]+)[\"']?"
+      ],
+      "depNameTemplate": "golangci/golangci-lint",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "description": "Update Hadolint version",
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "matchStrings": [
+        "hadolint-version:\\s*[\"']?v?(?<currentValue>[\\d.]+)[\"']?"
+      ],
+      "depNameTemplate": "hadolint/hadolint",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "description": "Update kubeconform version",
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "matchStrings": [
+        "kubeconform-version:\\s*[\"']?(?<currentValue>[\\d.]+)[\"']?"
+      ],
+      "depNameTemplate": "yannh/kubeconform",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "description": "Update gosec version",
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "matchStrings": [
+        "gosec-version:\\s*[\"']?(?<currentValue>[\\d.]+)[\"']?"
+      ],
+      "depNameTemplate": "securego/gosec",
+      "datasourceTemplate": "github-releases"
+    }
+  ]
+}

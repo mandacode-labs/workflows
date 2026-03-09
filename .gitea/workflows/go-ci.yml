@@ -222,13 +222,6 @@ jobs:
           args: "-fmt sarif -out gosec-results.sarif ./..."
         continue-on-error: true
 
-      - name: Upload gosec results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: gosec-results.sarif
-          category: gosec
-        continue-on-error: true
-
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
@@ -252,4 +245,4 @@ jobs:
             else
               echo "**Status:** ⚠️ Security issues detected (check details above)"
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITEA_STEP_SUMMARY"
