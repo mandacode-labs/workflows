@@ -133,8 +133,6 @@ jobs:
           push: false
           load: ${{ !contains(inputs.platforms, ',') }}
           tags: ${{ steps.tag.outputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           outputs: type=docker,dest=${{ steps.tag.outputs.tarball }}
 
       - name: Test image (basic run)
