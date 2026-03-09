@@ -211,8 +211,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           build-args: ${{ inputs.build-args }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           provenance: ${{ inputs.enable-provenance }}
           sbom: ${{ inputs.enable-sbom }}
 
