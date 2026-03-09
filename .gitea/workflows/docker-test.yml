@@ -113,6 +113,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Generate image tag
+        id: tag
+        run: |
+          # Create a safe tag from dockerfile path (replace / and . with -)
+          DOCKERFILE="${{ steps.paths.outputs.dockerfile }}"
+          SAFE_TAG=$(echo "$DOCKERFILE" | sed 's/[\/\.]/-/g' | sed 's/^-//')
+          echo "tag=test-${SAFE_TAG}:latest" >> "$GITEA_OUTPUT"
+          echo "tarball=/tmp/image-${SAFE_TAG}.tar" >> "$GITEA_OUTPUT"
+          echo "✅ Generated tag: test-${SAFE_TAG}:latest"
+
       - name: Build Docker image
         id: build
         uses: docker/build-push-action@v6
@@ -122,31 +132,31 @@ jobs:
           platforms: ${{ inputs.platforms }}
           push: false
           load: ${{ !contains(inputs.platforms, ',') }}
-          tags: test-${{ strategy.job-index }}:latest
+          tags: ${{ steps.tag.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          outputs: type=docker,dest=/tmp/image-${{ strategy.job-index }}.tar
+          outputs: type=docker,dest=${{ steps.tag.outputs.tarball }}
 
       - name: Test image (basic run)
         if: ${{ !inputs.test-build-only && !contains(inputs.platforms, ',') }}
         run: |
           echo "🧪 Testing image startup..."
           # Load image if multi-platform build
-          if [ -f "/tmp/image-${{ strategy.job-index }}.tar" ]; then
-            docker load -i /tmp/image-${{ strategy.job-index }}.tar
+          if [ -f "${{ steps.tag.outputs.tarball }}" ]; then
+            docker load -i ${{ steps.tag.outputs.tarball }}
           fi
 
           # Try to run with --version, --help, or just start and stop
-          docker run --rm test-${{ strategy.job-index }}:latest --version || \
-          docker run --rm test-${{ strategy.job-index }}:latest --help || \
-          docker run --rm --entrypoint sh test-${{ strategy.job-index }}:latest -c "echo 'Container started successfully'" || \
+          docker run --rm ${{ steps.tag.outputs.tag }} --version || \
+          docker run --rm ${{ steps.tag.outputs.tag }} --help || \
+          docker run --rm --entrypoint sh ${{ steps.tag.outputs.tag }} -c "echo 'Container started successfully'" || \
           echo "⚠️ Warning: Could not run container, but build succeeded"
 
       - name: Run Trivy vulnerability scanner
         if: inputs.enable-trivy && !contains(inputs.platforms, ',')
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          input: /tmp/image-${{ strategy.job-index }}.tar
+          input: ${{ steps.tag.outputs.tarball }}
           format: "sarif"
           output: "trivy-results.sarif"
           severity: ${{ inputs.trivy-severity }}
