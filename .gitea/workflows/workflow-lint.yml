@@ -50,7 +50,7 @@ jobs:
       - name: Run actionlint
         run: |
           echo "🔍 Running actionlint on workflow files..."
-          actionlint -color -ignore-runner="label 'runs-on' not found" .gitea/workflows/
+          actionlint -color -ignore="label 'runs-on' not found" .gitea/workflows/*.yml
           echo "✅ actionlint passed"
 
       - name: Generate actionlint summary
