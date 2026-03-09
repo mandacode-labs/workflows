@@ -15,7 +15,7 @@ name: Docker Build (AWS ECR)
 #         images: '[{"name": "myapp", "dockerfile": "Dockerfile"}]'
 #         aws-region: us-east-1
 #         ecr-repository-prefix: my-company
-#         tag: ${{ github.ref_name }}
+#         tag: ${{ gitea.ref_name }}
 #       secrets:
 #         aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
 #
@@ -27,7 +27,7 @@ name: Docker Build (AWS ECR)
 #         images: '[{"name": "myapp", "dockerfile": "Dockerfile"}]'
 #         aws-region: us-east-1
 #         ecr-repository-prefix: my-company
-#         tag: ${{ github.ref_name }}
+#         tag: ${{ gitea.ref_name }}
 #       secrets:
 #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
 #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -134,7 +134,7 @@ jobs:
           # Check if tag has expected prefix
           if [ -n "$PREFIX" ] && [[ ! "$TAG" == "$PREFIX"* ]]; then
             echo "⚠️ Tag '$TAG' does not have expected prefix '$PREFIX'. Skipping build."
-            echo "should-build=false" >> "$GITHUB_OUTPUT"
+            echo "should-build=false" >> "$GITEA_OUTPUT"
             exit 0
           fi
 
@@ -145,8 +145,8 @@ jobs:
             CLEAN_TAG="$TAG"
           fi
 
-          echo "clean-tag=${CLEAN_TAG}" >> "$GITHUB_OUTPUT"
-          echo "should-build=true" >> "$GITHUB_OUTPUT"
+          echo "clean-tag=${CLEAN_TAG}" >> "$GITEA_OUTPUT"
+          echo "should-build=true" >> "$GITEA_OUTPUT"
           echo "✅ Clean tag: ${CLEAN_TAG}"
 
   build-and-push:
@@ -200,7 +200,7 @@ jobs:
             REGISTRY="$AUTO_REGISTRY"
             echo "Using auto-detected registry: $REGISTRY"
           fi
-          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
+          echo "registry=$REGISTRY" >> "$GITEA_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -222,7 +222,7 @@ jobs:
             exit 1
           fi
 
-          echo "dockerfile=$DOCKERFILE" >> "$GITHUB_OUTPUT"
+          echo "dockerfile=$DOCKERFILE" >> "$GITEA_OUTPUT"
           echo "✅ Dockerfile found: $DOCKERFILE"
 
       - name: Determine ECR repository name
@@ -236,7 +236,7 @@ jobs:
           else
             ECR_REPO="${IMAGE_NAME}"
           fi
-          echo "repository=$ECR_REPO" >> "$GITHUB_OUTPUT"
+          echo "repository=$ECR_REPO" >> "$GITEA_OUTPUT"
           echo "📦 ECR repository: $ECR_REPO"
 
       - name: Create ECR repository if needed
@@ -285,7 +285,7 @@ jobs:
             done
           fi
 
-          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "tags=${TAGS}" >> "$GITEA_OUTPUT"
           echo "📦 Generated tags:"
           echo "$TAGS" | tr ',' '\n' | sed 's/^/  - /'
 
@@ -349,4 +349,4 @@ jobs:
             if [ "${{ inputs.enable-sbom }}" = "true" ]; then
               echo "**SBOM:** ✅ Enabled"
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITEA_STEP_SUMMARY"

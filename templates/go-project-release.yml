@@ -1,0 +1,97 @@
+# Template: Go Project - Release (Gitea Registry)
+#
+# Complete release workflow for Go projects to Gitea Container Registry
+# Includes: Docker build/push and Helm chart packaging
+#
+# Usage:
+#   1. Copy this file to your project's .gitea/workflows/release.yml
+#   2. Update registry URL to your Gitea instance (gitea.example.com)
+#   3. Configure GITEA_TOKEN secret with packages:write permission
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  docker-build:
+    name: Build and Push Docker Images
+    uses: mandacode-lab/workflows/.gitea/workflows/docker-build.yml@main
+    with:
+      # Images to build (REQUIRED)
+      images: |
+        [
+          {"name": "myapp", "dockerfile": "Dockerfile"}
+        ]
+      # Multiple images example:
+      # images: |
+      #   [
+      #     {"name": "api", "dockerfile": "Dockerfile"},
+      #     {"name": "worker", "dockerfile": "services/worker/Dockerfile"}
+      #   ]
+
+      # Registry configuration (REQUIRED - change to your Gitea instance)
+      registry: "gitea.example.com"
+      repository: ${{ gitea.repository }}
+
+      # Tagging
+      tag: ${{ gitea.ref_name }}
+      tag-prefix: "v"
+      # additional-tags: "latest,stable"
+
+      # Build options
+      # base-path: ""
+      # build-context: "."
+      platforms: "linux/amd64"
+      # platforms: "linux/amd64,linux/arm64"
+
+      # Build arguments
+      # build-args: |
+      #   VERSION=${{ gitea.ref_name }}
+      #   GIT_COMMIT=${{ gitea.sha }}
+
+      # Security attestations
+      enable-provenance: false
+      enable-sbom: false
+
+    secrets:
+      registry-username: ${{ gitea.actor }}
+      registry-password: ${{ secrets.GITEA_TOKEN }}
+
+  # Delete this job if you don't use Helm charts
+  helm-package:
+    name: Package and Push Helm Charts
+    needs: docker-build
+    uses: mandacode-lab/workflows/.gitea/workflows/helm-package.yml@main
+    with:
+      # Charts to package (REQUIRED)
+      charts: |
+        [
+          {"dir": "charts/myapp"}
+        ]
+
+      # Registry configuration (REQUIRED)
+      registry: "gitea.example.com"
+      repository: ${{ gitea.repository }}
+
+      # Options
+      # base-path: ""
+      # helm-version: "v4.0.4"
+      skip-existing: true
+
+      # Security
+      enable-signing: false
+      enable-provenance: false
+
+    secrets:
+      registry-username: ${{ gitea.actor }}
+      registry-password: ${{ secrets.GITEA_TOKEN }}
+      # GPG signing secrets (only if enable-signing: true)
+      # gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+      # gpg-key-name: ${{ secrets.GPG_KEY_NAME }}
+      # gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}

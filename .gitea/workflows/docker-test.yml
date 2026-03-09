@@ -91,7 +91,7 @@ jobs:
             exit 1
           fi
 
-          echo "dockerfile=$DOCKERFILE" >> "$GITHUB_OUTPUT"
+          echo "dockerfile=$DOCKERFILE" >> "$GITEA_OUTPUT"
           echo "✅ Dockerfile found: $DOCKERFILE"
 
       - name: Run Hadolint
@@ -104,14 +104,6 @@ jobs:
           output-file: hadolint-results.sarif
           # Hadolint version is specified in the action
           version: ${{ inputs.hadolint-version }}
-        continue-on-error: true
-
-      - name: Upload Hadolint results to GitHub Security
-        if: inputs.enable-hadolint
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: hadolint-results.sarif
-          category: hadolint-${{ matrix.image.dockerfile }}
         continue-on-error: true
 
       - name: Set up QEMU
@@ -162,14 +154,6 @@ jobs:
           vuln-type: "os,library"
         continue-on-error: true
 
-      - name: Upload Trivy results to GitHub Security
-        if: inputs.enable-trivy && !contains(inputs.platforms, ',')
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-results.sarif
-          category: trivy-${{ matrix.image.dockerfile }}
-        continue-on-error: true
-
       - name: Generate test summary
         if: always()
         run: |
@@ -200,4 +184,4 @@ jobs:
               echo "- ✅ Trivy security scan"
             fi
 
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITEA_STEP_SUMMARY"

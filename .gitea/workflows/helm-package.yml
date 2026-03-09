@@ -1,7 +1,7 @@
 name: Helm Package
 
 # Reusable workflow for packaging and pushing Helm charts to OCI registries
-# Supports: GitHub Container Registry (GHCR), Docker Hub, Harbor, and other OCI-compatible registries
+# Supports: Gitea Container Registry, Docker Hub, Harbor, and other OCI-compatible registries
 # Includes optional GPG signing support
 #
 # Usage example:
@@ -10,11 +10,11 @@ name: Helm Package
 #       uses: your-org/workflows/.gitea/workflows/helm-package.yml@main
 #       with:
 #         charts: '[{"dir": "charts/myapp"}]'
-#         registry: ghcr.io
-#         repository: ${{ github.repository }}
+#         registry: gitea.example.com
+#         repository: ${{ gitea.repository }}
 #       secrets:
-#         registry-username: ${{ github.actor }}
-#         registry-password: ${{ secrets.GITHUB_TOKEN }}
+#         registry-username: ${{ gitea.actor }}
+#         registry-password: ${{ secrets.GITEA_TOKEN }}
 
 on:
   workflow_call:
@@ -29,10 +29,10 @@ on:
         type: string
         default: ""
       registry:
-        description: "OCI registry for Helm charts (e.g., ghcr.io, registry-1.docker.io)"
+        description: "OCI registry for Helm charts (e.g., gitea.example.com, registry-1.docker.io)"
         required: false
         type: string
-        default: "ghcr.io"
+        default: ""
       repository:
         description: "Repository path in registry (e.g., owner/repo-name)"
         required: true
@@ -115,7 +115,7 @@ jobs:
             exit 1
           fi
 
-          echo "chart-dir=$CHART_DIR" >> "$GITHUB_OUTPUT"
+          echo "chart-dir=$CHART_DIR" >> "$GITEA_OUTPUT"
           echo "✅ Chart found: $CHART_DIR"
 
       - name: Extract chart metadata
@@ -132,7 +132,7 @@ jobs:
             echo "version=$CHART_VERSION"
             echo "app-version=$CHART_APP_VERSION"
             echo "type=$CHART_TYPE"
-          } >> "$GITHUB_OUTPUT"
+          } >> "$GITEA_OUTPUT"
 
           echo "📦 Chart Metadata:"
           echo "  Name: $CHART_NAME"
@@ -194,7 +194,7 @@ jobs:
           fi
 
           PACKAGE_FILE=$(ls .helm-packages/*.tgz)
-          echo "package-file=$PACKAGE_FILE" >> "$GITHUB_OUTPUT"
+          echo "package-file=$PACKAGE_FILE" >> "$GITEA_OUTPUT"
           echo "✅ Chart packaged: $PACKAGE_FILE"
 
           ls -lh .helm-packages/
@@ -211,10 +211,10 @@ jobs:
           echo "🔍 Checking if chart version already exists..."
 
           if helm pull "oci://${REGISTRY}/${REPOSITORY}/${CHART_NAME}" --version "${CHART_VERSION}" --destination /tmp 2>/dev/null; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "exists=true" >> "$GITEA_OUTPUT"
             echo "⚠️ Chart ${CHART_NAME}:${CHART_VERSION} already exists in registry"
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "exists=false" >> "$GITEA_OUTPUT"
             echo "✅ Chart ${CHART_NAME}:${CHART_VERSION} does not exist, will push"
           fi
 
@@ -274,4 +274,4 @@ jobs:
             else
               echo "**Status:** ❌ Failed"
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITEA_STEP_SUMMARY"
