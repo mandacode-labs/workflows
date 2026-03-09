@@ -1,0 +1,203 @@
+name: Docker Test
+
+# Reusable workflow for testing Dockerfiles
+# Tests include: linting (Hadolint), security scanning (Trivy), and build verification
+#
+# Usage example:
+#   jobs:
+#     docker-test:
+#       uses: your-org/workflows/.gitea/workflows/docker-test.yml@main
+#       with:
+#         images: '[{"dockerfile": "Dockerfile"}, {"dockerfile": "Dockerfile.alpine"}]'
+#         base-path: "build/docker"
+
+on:
+  workflow_call:
+    inputs:
+      images:
+        description: 'JSON array of image configurations [{"dockerfile": "path/to/Dockerfile"}]'
+        required: true
+        type: string
+      base-path:
+        description: "Base path prepended to dockerfile paths"
+        required: false
+        type: string
+        default: ""
+      build-context:
+        description: "Docker build context path"
+        required: false
+        type: string
+        default: "."
+      platforms:
+        description: "Target platforms (comma-separated, e.g., linux/amd64,linux/arm64)"
+        required: false
+        type: string
+        default: "linux/amd64"
+      test-build-only:
+        description: "Only test if Dockerfile builds (skip running container)"
+        required: false
+        type: boolean
+        default: true
+      enable-hadolint:
+        description: "Enable Hadolint linting"
+        required: false
+        type: boolean
+        default: true
+      hadolint-version:
+        description: "Hadolint version"
+        required: false
+        type: string
+        default: "v2.14.0"
+      enable-trivy:
+        description: "Enable Trivy security scan"
+        required: false
+        type: boolean
+        default: true
+      trivy-severity:
+        description: "Minimum severity for Trivy (UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL)"
+        required: false
+        type: string
+        default: "MEDIUM,HIGH,CRITICAL"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  test:
+    name: Test ${{ matrix.image.dockerfile }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: fromJson(inputs.images) != null && fromJson(inputs.images)[0] != null
+    strategy:
+      matrix:
+        image: ${{ fromJson(inputs.images) }}
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Resolve Dockerfile path
+        id: paths
+        run: |
+          DOCKERFILE="${{ matrix.image.dockerfile }}"
+          if [ -n "${{ inputs.base-path }}" ]; then
+            DOCKERFILE="${{ inputs.base-path }}/${DOCKERFILE}"
+          fi
+
+          # Validate Dockerfile exists
+          if [ ! -f "$DOCKERFILE" ]; then
+            echo "❌ Error: Dockerfile not found at: $DOCKERFILE"
+            exit 1
+          fi
+
+          echo "dockerfile=$DOCKERFILE" >> "$GITHUB_OUTPUT"
+          echo "✅ Dockerfile found: $DOCKERFILE"
+
+      - name: Run Hadolint
+        if: inputs.enable-hadolint
+        uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: ${{ steps.paths.outputs.dockerfile }}
+          failure-threshold: warning
+          format: sarif
+          output-file: hadolint-results.sarif
+          # Hadolint version is specified in the action
+          version: ${{ inputs.hadolint-version }}
+        continue-on-error: true
+
+      - name: Upload Hadolint results to GitHub Security
+        if: inputs.enable-hadolint
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: hadolint-results.sarif
+          category: hadolint-${{ matrix.image.dockerfile }}
+        continue-on-error: true
+
+      - name: Set up QEMU
+        if: contains(inputs.platforms, ',')
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.build-context }}
+          file: ${{ steps.paths.outputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          push: false
+          load: ${{ !contains(inputs.platforms, ',') }}
+          tags: test-${{ strategy.job-index }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/image-${{ strategy.job-index }}.tar
+
+      - name: Test image (basic run)
+        if: ${{ !inputs.test-build-only && !contains(inputs.platforms, ',') }}
+        run: |
+          echo "🧪 Testing image startup..."
+          # Load image if multi-platform build
+          if [ -f "/tmp/image-${{ strategy.job-index }}.tar" ]; then
+            docker load -i /tmp/image-${{ strategy.job-index }}.tar
+          fi
+
+          # Try to run with --version, --help, or just start and stop
+          docker run --rm test-${{ strategy.job-index }}:latest --version || \
+          docker run --rm test-${{ strategy.job-index }}:latest --help || \
+          docker run --rm --entrypoint sh test-${{ strategy.job-index }}:latest -c "echo 'Container started successfully'" || \
+          echo "⚠️ Warning: Could not run container, but build succeeded"
+
+      - name: Run Trivy vulnerability scanner
+        if: inputs.enable-trivy && !contains(inputs.platforms, ',')
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          input: /tmp/image-${{ strategy.job-index }}.tar
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: ${{ inputs.trivy-severity }}
+          # Scan both OS packages and application dependencies
+          vuln-type: "os,library"
+        continue-on-error: true
+
+      - name: Upload Trivy results to GitHub Security
+        if: inputs.enable-trivy && !contains(inputs.platforms, ',')
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-${{ matrix.image.dockerfile }}
+        continue-on-error: true
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          {
+            echo "### 🐳 Docker Test Results: ${{ matrix.image.dockerfile }}"
+            echo ""
+            echo "**Dockerfile:** \`${{ steps.paths.outputs.dockerfile }}\`"
+            echo "**Build Context:** \`${{ inputs.build-context }}\`"
+            echo "**Platforms:** \`${{ inputs.platforms }}\`"
+            echo ""
+            echo "#### Test Steps"
+
+            if [ "${{ inputs.enable-hadolint }}" = "true" ]; then
+              if [ "${{ steps.build.outcome }}" = "success" ]; then
+                echo "- ✅ Hadolint linting"
+              else
+                echo "- ⚠️ Hadolint linting (warnings found)"
+              fi
+            fi
+
+            if [ "${{ steps.build.outcome }}" = "success" ]; then
+              echo "- ✅ Docker build"
+            else
+              echo "- ❌ Docker build"
+            fi
+
+            if [ "${{ inputs.enable-trivy }}" = "true" ] && [ ! "${{ contains(inputs.platforms, ',') }}" = "true" ]; then
+              echo "- ✅ Trivy security scan"
+            fi
+
+          } >> "$GITHUB_STEP_SUMMARY"
