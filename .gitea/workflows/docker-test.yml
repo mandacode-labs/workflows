@@ -116,12 +116,12 @@ jobs:
       - name: Generate image tag
         id: tag
         run: |
-          # Create a safe tag from dockerfile path (replace / and . with -)
+          # Generate unique tag using short SHA of dockerfile path
           DOCKERFILE="${{ steps.paths.outputs.dockerfile }}"
-          SAFE_TAG=$(echo "$DOCKERFILE" | sed 's/[\/\.]/-/g' | sed 's/^-//')
-          echo "tag=test-${SAFE_TAG}:latest" >> "$GITEA_OUTPUT"
-          echo "tarball=/tmp/image-${SAFE_TAG}.tar" >> "$GITEA_OUTPUT"
-          echo "✅ Generated tag: test-${SAFE_TAG}:latest"
+          SHORT_SHA=$(echo -n "$DOCKERFILE" | sha256sum | cut -c1-8)
+          echo "tag=test-${SHORT_SHA}:latest" >> "$GITEA_OUTPUT"
+          echo "tarball=/tmp/image-${SHORT_SHA}.tar" >> "$GITEA_OUTPUT"
+          echo "✅ Generated tag: test-${SHORT_SHA}:latest (from $DOCKERFILE)"
 
       - name: Build Docker image
         id: build
