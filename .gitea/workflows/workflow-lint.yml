@@ -50,7 +50,7 @@ jobs:
       - name: Run actionlint
         run: |
           echo "🔍 Running actionlint on workflow files..."
-          actionlint -color -verbose
+          actionlint -color
           echo "✅ actionlint passed"
 
       - name: Generate actionlint summary
