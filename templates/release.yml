@@ -12,7 +12,7 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ["v*"]
 
 permissions:
   contents: read
@@ -76,8 +76,8 @@ jobs:
         ]
 
       # Registry configuration (REQUIRED)
-      registry: "ghcr.io"
-      repository: ${{ github.repository }}
+      registry: ${{ vars.REGISTRY }}
+      repository: ${{ vars.REPOSITORY }}
 
       # Options
       # base-path: ""

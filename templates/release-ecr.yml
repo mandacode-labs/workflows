@@ -44,8 +44,8 @@ jobs:
 
       # AWS configuration (REQUIRED)
       aws-region: ap-northeast-2
-      # ecr-registry: ""  # Auto-detected from credentials
-      ecr-repository-prefix: mycompany
+      ecr-registry: ${{ vars.REGISTRY }}
+      ecr-repository-prefix: ${{ vars.REPOSITORY }}
 
       # Tagging
       tag: ${{ github.ref_name }}
