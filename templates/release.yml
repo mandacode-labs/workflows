@@ -1,6 +1,6 @@
-# Template: Go Project - Release (Gitea Registry)
+# Template: Release (Gitea Registry)
 #
-# Complete release workflow for Go projects to Gitea Container Registry
+# Complete release workflow to Gitea Container Registry
 # Includes: Docker build/push and Helm chart packaging
 #
 # Usage:

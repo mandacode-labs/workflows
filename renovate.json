@@ -12,6 +12,7 @@
   ],
   "fileMatches": [
     "\\.gitea/workflows/.+\\.ya?ml$",
+    "\\.github/workflows/.+\\.ya?ml$",
     "templates/.+\\.ya?ml$"
   ],
   "labels": [
@@ -70,7 +71,7 @@
   "regexManagers": [
     {
       "description": "Update Go version in workflows",
-      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "\\.github/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
       "matchStrings": [
         "go-version:\\s*[\"']?(?<currentValue>[\\d.]+)[\"']?"
       ],
@@ -79,7 +80,7 @@
     },
     {
       "description": "Update Helm version in workflows",
-      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "\\.github/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
       "matchStrings": [
         "helm-version:\\s*[\"']?v?(?<currentValue>[\\d.]+)[\"']?"
       ],
@@ -88,7 +89,7 @@
     },
     {
       "description": "Update Kubernetes version in workflows",
-      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "\\.github/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
       "matchStrings": [
         "kubernetes-version:\\s*[\"']?v?(?<currentValue>[\\d.]+)[\"']?"
       ],
@@ -97,7 +98,7 @@
     },
     {
       "description": "Update golangci-lint version",
-      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "\\.github/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
       "matchStrings": [
         "lint-version:\\s*[\"']?v?(?<currentValue>[\\d.]+)[\"']?"
       ],
@@ -106,7 +107,7 @@
     },
     {
       "description": "Update Hadolint version",
-      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "\\.github/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
       "matchStrings": [
         "hadolint-version:\\s*[\"']?v?(?<currentValue>[\\d.]+)[\"']?"
       ],
@@ -115,7 +116,7 @@
     },
     {
       "description": "Update kubeconform version",
-      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "\\.github/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
       "matchStrings": [
         "kubeconform-version:\\s*[\"']?(?<currentValue>[\\d.]+)[\"']?"
       ],
@@ -124,7 +125,7 @@
     },
     {
       "description": "Update gosec version",
-      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
+      "fileMatch": ["\\.gitea/workflows/.+\\.ya?ml$", "\\.github/workflows/.+\\.ya?ml$", "templates/.+\\.ya?ml$"],
       "matchStrings": [
         "gosec-version:\\s*[\"']?(?<currentValue>[\\d.]+)[\"']?"
       ],

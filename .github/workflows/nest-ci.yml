@@ -1,0 +1,49 @@
+name: NestJS CI
+
+# Reusable CI workflow for NestJS projects
+# Runs lint, test, and build
+#
+# Usage example:
+#   jobs:
+#     nest-ci:
+#       uses: your-org/workflows/.github/workflows/nest-ci.yml@main
+#     # or with custom node version:
+#     # nest-ci:
+#     #   uses: your-org/workflows/.github/workflows/nest-ci.yml@main
+#     #   with:
+#     #     node-version: "20"
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: "Node.js version"
+        required: false
+        type: string
+        default: "25"
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

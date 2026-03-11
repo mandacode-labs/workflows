@@ -1,0 +1,94 @@
+# Template: NestJS Project - Pull Request
+#
+# Complete PR validation workflow for NestJS projects with Docker and Helm
+# Includes: NestJS CI (lint, test, build), Docker testing, Helm chart testing
+#
+# Usage:
+#   1. Copy this file to your project's .gitea/workflows/pr.yml
+#   2. Modify the options below as needed
+#   3. Remove jobs you don't need (e.g., helm-test if no charts)
+
+name: Pull Request
+
+on:
+  pull_request:
+    branches: [main, develop]
+    # Uncomment to trigger only on specific file changes:
+    # paths:
+    #   - 'src/**'
+    #   - 'package*.json'
+    #   - 'Dockerfile*'
+    #   - 'charts/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # NestJS CI - Lint, Test, Build
+  nest-ci:
+    name: NestJS CI
+    uses: mandacode-lab/workflows/.gitea/workflows/nest-ci.yml@main
+    with:
+      node-version: "25"
+
+  # Docker Test - Lint, Security Scan, Build Verification
+  docker-test:
+    name: Docker Test
+    needs: nest-ci
+    uses: mandacode-lab/workflows/.gitea/workflows/docker-test.yml@main
+    with:
+      # Images to test (REQUIRED)
+      images: |
+        [
+          {"dockerfile": "Dockerfile"}
+        ]
+      # Multiple images example:
+      # images: |
+      #   [
+      #     {"dockerfile": "Dockerfile"},
+      #     {"dockerfile": "Dockerfile.alpine"}
+      #   ]
+
+      # base-path: ""
+      # build-context: "."
+      # platforms: "linux/amd64"
+      # test-build-only: true
+
+      # Linting
+      enable-hadolint: true
+      # hadolint-version: "v2.14.0"
+
+      # Security scanning
+      enable-trivy: true
+      trivy-severity: "HIGH,CRITICAL"
+
+  # Helm Test - Lint, Validate, Install Test
+  # Delete this job if you don't use Helm charts
+  helm-test:
+    name: Helm Test
+    uses: mandacode-lab/workflows/.gitea/workflows/helm-test.yml@main
+    with:
+      # Charts to test (REQUIRED)
+      charts: |
+        [
+          {"dir": "charts/myapp"}
+        ]
+      # Multiple charts example:
+      # charts: |
+      #   [
+      #     {"dir": "charts/api"},
+      #     {"dir": "charts/worker"}
+      #   ]
+
+      # base-path: ""
+      # helm-version: "v4.0.4"
+      # kubernetes-version: "v1.34.0"
+
+      # Validation
+      enable-kubeconform: true
+      # kubeconform-version: "0.7.0"
+
+      # Install test (uses Kind cluster)
+      enable-install-test: true
