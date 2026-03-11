@@ -1,13 +1,26 @@
 name: NestJS CI
 
-# Simple CI workflow for NestJS projects
-# Runs on push and PR to main branch
+# Reusable CI workflow for NestJS projects
+# Runs lint, test, and build
+#
+# Usage example:
+#   jobs:
+#     nest-ci:
+#       uses: your-org/workflows/.github/workflows/nest-ci.yml@main
+#     # or with custom node version:
+#     # nest-ci:
+#     #   uses: your-org/workflows/.github/workflows/nest-ci.yml@main
+#     #   with:
+#     #     node-version: "20"
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+  workflow_call:
+    inputs:
+      node-version:
+        description: "Node.js version"
+        required: false
+        type: string
+        default: "25"
 
 jobs:
   ci:
@@ -20,7 +33,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: "22"
+          node-version: ${{ inputs.node-version }}
           cache: "npm"
 
       - name: Install dependencies
