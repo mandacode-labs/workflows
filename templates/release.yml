@@ -21,7 +21,7 @@ permissions:
 jobs:
   docker-build:
     name: Build and Push Docker Images
-    uses: mandacode-lab/workflows/.github/workflows/docker-build.yml@main
+    uses: mandacode-labs/workflows/.github/workflows/docker-build.yml@main
     with:
       # Images to build (REQUIRED)
       images: |
@@ -67,7 +67,7 @@ jobs:
   helm-package:
     name: Package and Push Helm Charts
     needs: docker-build
-    uses: mandacode-lab/workflows/.github/workflows/helm-package.yml@main
+    uses: mandacode-labs/workflows/.github/workflows/helm-package.yml@main
     with:
       # Charts to package (REQUIRED)
       charts: |
