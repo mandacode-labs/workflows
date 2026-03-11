@@ -1,0 +1,354 @@
+name: Helm Package (AWS ECR)
+
+# Reusable workflow for packaging and pushing Helm charts to AWS ECR
+# Uses AWS credentials for authentication via OIDC or access keys
+# For other registries, use helm-package.yml instead
+#
+# Usage example (with OIDC):
+#   jobs:
+#     helm-package-ecr:
+#       permissions:
+#         id-token: write
+#         contents: read
+#       uses: mandacode-lab/workflows/.github/workflows/helm-package-ecr.yml@main
+#       with:
+#         charts: '[{"dir": "charts/myapp"}]'
+#         aws-region: us-east-1
+#         ecr-repository-prefix: my-company
+#       secrets:
+#         aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
+
+on:
+  workflow_call:
+    inputs:
+      charts:
+        description: 'JSON array of chart configurations [{"dir": "path/to/chart"}]'
+        required: true
+        type: string
+      base-path:
+        description: "Base path prepended to chart directories"
+        required: false
+        type: string
+        default: ""
+      aws-region:
+        description: "AWS region (e.g., us-east-1, ap-northeast-2)"
+        required: true
+        type: string
+      ecr-registry:
+        description: "ECR registry URL (e.g., 123456789012.dkr.ecr.us-east-1.amazonaws.com). If not provided, will be auto-detected."
+        required: false
+        type: string
+        default: ""
+      ecr-repository-prefix:
+        description: "ECR repository prefix (e.g., 'helm' for helm/chart-name)"
+        required: false
+        type: string
+        default: "helm"
+      helm-version:
+        description: "Helm version to use"
+        required: false
+        type: string
+        default: "v4.0.4"
+      enable-signing:
+        description: "Enable chart signing with GPG"
+        required: false
+        type: boolean
+        default: false
+      skip-existing:
+        description: "Skip push if chart version already exists in registry"
+        required: false
+        type: boolean
+        default: true
+      create-repository:
+        description: "Create ECR repository if it doesn't exist"
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      aws-role-arn:
+        description: "AWS IAM role ARN for OIDC authentication (preferred method)"
+        required: false
+      aws-access-key-id:
+        description: "AWS access key ID (alternative to OIDC)"
+        required: false
+      aws-secret-access-key:
+        description: "AWS secret access key (alternative to OIDC)"
+        required: false
+      gpg-private-key:
+        description: "GPG private key for signing (base64 encoded)"
+        required: false
+      gpg-key-name:
+        description: "GPG key name/email for signing"
+        required: false
+      gpg-passphrase:
+        description: "GPG key passphrase"
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  package-and-push:
+    name: Package ${{ matrix.chart.dir }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: fromJson(inputs.charts) != null && fromJson(inputs.charts)[0] != null
+    strategy:
+      matrix:
+        chart: ${{ fromJson(inputs.charts) }}
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.aws-role-arn }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Validate AWS credentials
+        run: |
+          if ! aws sts get-caller-identity &>/dev/null; then
+            echo "❌ Error: AWS credentials are not configured correctly"
+            echo "Please provide either:"
+            echo "  - aws-role-arn (for OIDC), or"
+            echo "  - aws-access-key-id and aws-secret-access-key"
+            exit 1
+          fi
+          echo "✅ AWS credentials validated"
+          aws sts get-caller-identity
+
+      - name: Get AWS Account ID
+        id: get-account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account-id=$ACCOUNT_ID" >> "$GITHUB_OUTPUT"
+          echo "AWS Account ID: $ACCOUNT_ID"
+
+      - name: Determine ECR registry
+        id: ecr-registry
+        env:
+          PROVIDED_REGISTRY: ${{ inputs.ecr-registry }}
+          AWS_ACCOUNT_ID: ${{ steps.get-account.outputs.account-id }}
+          AWS_REGION: ${{ inputs.aws-region }}
+        run: |
+          if [ -n "$PROVIDED_REGISTRY" ]; then
+            REGISTRY="$PROVIDED_REGISTRY"
+            echo "Using provided registry: $REGISTRY"
+          else
+            REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+            echo "Using auto-detected registry: $REGISTRY"
+          fi
+          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        env:
+          REGISTRY: ${{ steps.ecr-registry.outputs.registry }}
+          AWS_REGION: ${{ inputs.aws-region }}
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" | \
+            helm registry login "$REGISTRY" --username AWS --password-stdin
+          echo "✅ Logged in to ECR: $REGISTRY"
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ inputs.helm-version }}
+
+      - name: Resolve chart path
+        id: paths
+        run: |
+          CHART_DIR="${{ matrix.chart.dir }}"
+          if [ -n "${{ inputs.base-path }}" ]; then
+            CHART_DIR="${{ inputs.base-path }}/${CHART_DIR}"
+          fi
+
+          # Validate Chart.yaml exists
+          if [ ! -f "$CHART_DIR/Chart.yaml" ]; then
+            echo "❌ Error: Chart.yaml not found at: $CHART_DIR"
+            exit 1
+          fi
+
+          echo "chart-dir=$CHART_DIR" >> "$GITHUB_OUTPUT"
+          echo "✅ Chart found: $CHART_DIR"
+
+      - name: Extract chart metadata
+        id: meta
+        run: |
+          CHART_DIR="${{ steps.paths.outputs.chart-dir }}"
+          CHART_NAME=$(yq eval '.name' "$CHART_DIR/Chart.yaml")
+          CHART_VERSION=$(yq eval '.version' "$CHART_DIR/Chart.yaml")
+          CHART_APP_VERSION=$(yq eval '.appVersion // "N/A"' "$CHART_DIR/Chart.yaml")
+          CHART_TYPE=$(yq eval '.type // "application"' "$CHART_DIR/Chart.yaml")
+
+          {
+            echo "name=$CHART_NAME"
+            echo "version=$CHART_VERSION"
+            echo "app-version=$CHART_APP_VERSION"
+            echo "type=$CHART_TYPE"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "📦 Chart Metadata:"
+          echo "  Name: $CHART_NAME"
+          echo "  Version: $CHART_VERSION"
+          echo "  App Version: $CHART_APP_VERSION"
+          echo "  Type: $CHART_TYPE"
+
+      - name: Determine ECR repository name
+        id: ecr-repo
+        env:
+          CHART_NAME: ${{ steps.meta.outputs.name }}
+          REPO_PREFIX: ${{ inputs.ecr-repository-prefix }}
+        run: |
+          if [ -n "$REPO_PREFIX" ]; then
+            ECR_REPO="${REPO_PREFIX}/${CHART_NAME}"
+          else
+            ECR_REPO="${CHART_NAME}"
+          fi
+          echo "repository=$ECR_REPO" >> "$GITHUB_OUTPUT"
+          echo "📦 ECR repository: $ECR_REPO"
+
+      - name: Create ECR repository if needed
+        if: inputs.create-repository
+        env:
+          ECR_REPO: ${{ steps.ecr-repo.outputs.repository }}
+          AWS_REGION: ${{ inputs.aws-region }}
+        run: |
+          if aws ecr describe-repositories --repository-names "$ECR_REPO" --region "$AWS_REGION" &>/dev/null; then
+            echo "✅ ECR repository '$ECR_REPO' already exists"
+          else
+            echo "📦 Creating ECR repository '$ECR_REPO'..."
+            aws ecr create-repository \
+              --repository-name "$ECR_REPO" \
+              --region "$AWS_REGION" \
+              --image-scanning-configuration scanOnPush=true \
+              --encryption-configuration encryptionType=AES256
+            echo "✅ ECR repository created"
+          fi
+
+      - name: Setup GPG
+        if: inputs.enable-signing
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.gpg-private-key }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "❌ Error: GPG signing enabled but gpg-private-key secret not provided"
+            exit 1
+          fi
+
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --import --batch --yes
+          echo "✅ GPG key imported"
+
+      - name: Update chart dependencies
+        run: |
+          CHART_DIR="${{ steps.paths.outputs.chart-dir }}"
+          if [ -f "$CHART_DIR/Chart.lock" ] || [ -f "$CHART_DIR/requirements.lock" ]; then
+            echo "📥 Updating chart dependencies..."
+            helm dependency update "$CHART_DIR"
+          else
+            echo "ℹ️ No dependencies to update"
+          fi
+
+      - name: Package chart
+        id: package
+        env:
+          CHART_DIR: ${{ steps.paths.outputs.chart-dir }}
+          ENABLE_SIGNING: ${{ inputs.enable-signing }}
+          GPG_KEY_NAME: ${{ secrets.gpg-key-name }}
+          GPG_PASSPHRASE: ${{ secrets.gpg-passphrase }}
+        run: |
+          mkdir -p .helm-packages
+
+          if [ "$ENABLE_SIGNING" = "true" ]; then
+            echo "🔐 Packaging and signing chart..."
+            echo "$GPG_PASSPHRASE" | helm package "$CHART_DIR" \
+              --destination .helm-packages \
+              --sign \
+              --key "$GPG_KEY_NAME" \
+              --keyring ~/.gnupg/pubring.gpg \
+              --passphrase-fd 0
+          else
+            echo "📦 Packaging chart..."
+            helm package "$CHART_DIR" --destination .helm-packages
+          fi
+
+          PACKAGE_FILE=$(ls .helm-packages/*.tgz)
+          echo "package-file=$PACKAGE_FILE" >> "$GITHUB_OUTPUT"
+          echo "✅ Chart packaged: $PACKAGE_FILE"
+
+          ls -lh .helm-packages/
+
+      - name: Check if chart version already exists
+        if: inputs.skip-existing
+        id: check-exists
+        env:
+          REGISTRY: ${{ steps.ecr-registry.outputs.registry }}
+          ECR_REPO: ${{ steps.ecr-repo.outputs.repository }}
+          CHART_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          echo "🔍 Checking if chart version already exists..."
+
+          if helm pull "oci://${REGISTRY}/${ECR_REPO}" --version "${CHART_VERSION}" --destination /tmp 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "⚠️ Chart version ${CHART_VERSION} already exists in ECR"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "✅ Chart version ${CHART_VERSION} does not exist, will push"
+          fi
+
+      - name: Push chart to ECR
+        if: ${{ !inputs.skip-existing || steps.check-exists.outputs.exists == 'false' }}
+        env:
+          REGISTRY: ${{ steps.ecr-registry.outputs.registry }}
+          ECR_REPO: ${{ steps.ecr-repo.outputs.repository }}
+          PACKAGE_FILE: ${{ steps.package.outputs.package-file }}
+        run: |
+          echo "🚀 Pushing chart to AWS ECR..."
+          helm push "$PACKAGE_FILE" "oci://${REGISTRY}/${ECR_REPO}"
+          echo "✅ Chart pushed successfully to ${REGISTRY}/${ECR_REPO}"
+
+      - name: Skip push (already exists)
+        if: inputs.skip-existing && steps.check-exists.outputs.exists == 'true'
+        run: |
+          echo "⏭️ Skipping push - ${{ steps.meta.outputs.name }}:${{ steps.meta.outputs.version }} already exists in ECR"
+
+      - name: Upload chart package as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart-${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}
+          path: .helm-packages/
+          retention-days: 7
+
+      - name: Generate summary
+        if: always()
+        run: |
+          {
+            echo "### ⎈ Helm Package Results (AWS ECR): ${{ steps.meta.outputs.name }}"
+            echo ""
+            echo "**Chart:** \`${{ steps.meta.outputs.name }}\`"
+            echo "**Version:** \`${{ steps.meta.outputs.version }}\`"
+            echo "**App Version:** \`${{ steps.meta.outputs.app-version }}\`"
+            echo "**Type:** \`${{ steps.meta.outputs.type }}\`"
+            echo "**ECR Registry:** \`${{ steps.ecr-registry.outputs.registry }}/${{ steps.ecr-repo.outputs.repository }}\`"
+            echo "**AWS Region:** \`${{ inputs.aws-region }}\`"
+            echo ""
+
+            if [ "${{ inputs.skip-existing }}" = "true" ] && [ "${{ steps.check-exists.outputs.exists }}" = "true" ]; then
+              echo "**Status:** ⏭️ Skipped (already exists)"
+            elif [ "${{ job.status }}" = "success" ]; then
+              echo "**Status:** ✅ Packaged and pushed successfully"
+              if [ "${{ inputs.enable-signing }}" = "true" ]; then
+                echo "**Signing:** 🔐 GPG signed"
+              fi
+            else
+              echo "**Status:** ❌ Failed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

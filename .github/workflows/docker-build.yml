@@ -1,0 +1,254 @@
+name: Docker Build
+
+# Reusable workflow for building and pushing Docker images to standard registries
+# Supports: GitHub Container Registry, Docker Hub, Harbor, and other OCI-compatible registries
+# For AWS ECR, use docker-build-ecr.yml instead
+#
+# Usage example:
+#   jobs:
+#     docker-build:
+#       uses: your-org/workflows/.github/workflows/docker-build.yml@main
+#       with:
+#         images: '[{"name": "myapp", "dockerfile": "Dockerfile"}]'
+#         registry: ghcr.io
+#         repository: ${{ github.repository }}
+#         tag: ${{ github.ref_name }}
+#       secrets:
+#         registry-username: ${{ github.actor }}
+#         registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+on:
+  workflow_call:
+    inputs:
+      images:
+        description: 'JSON array of image configurations [{"name": "app-name", "dockerfile": "path/to/Dockerfile"}]'
+        required: true
+        type: string
+      base-path:
+        description: "Base path prepended to dockerfile paths"
+        required: false
+        type: string
+        default: ""
+      build-context:
+        description: "Docker build context path"
+        required: false
+        type: string
+        default: "."
+      registry:
+        description: "Docker registry (e.g., ghcr.io, docker.io, registry.example.com)"
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository path in registry (e.g., owner/repo-name)"
+        required: true
+        type: string
+      tag:
+        description: "Docker image tag (e.g., v1.0.0, latest, commit-sha)"
+        required: true
+        type: string
+      tag-prefix:
+        description: "Tag prefix to remove (e.g., 'v' to convert 'v1.0.0' to '1.0.0')"
+        required: false
+        type: string
+        default: ""
+      additional-tags:
+        description: "Additional tags to apply (comma-separated, e.g., 'latest,stable')"
+        required: false
+        type: string
+        default: ""
+      platforms:
+        description: "Target platforms (comma-separated, e.g., 'linux/amd64,linux/arm64')"
+        required: false
+        type: string
+        default: "linux/amd64"
+      enable-provenance:
+        description: "Enable build provenance attestation"
+        required: false
+        type: boolean
+        default: true
+      enable-sbom:
+        description: "Enable SBOM attestation"
+        required: false
+        type: boolean
+        default: true
+      build-args:
+        description: "Build arguments (newline-separated KEY=value pairs)"
+        required: false
+        type: string
+        default: ""
+    secrets:
+      registry-username:
+        description: "Registry username"
+        required: true
+      registry-password:
+        description: "Registry password/token"
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  prepare:
+    name: Prepare Tags
+    runs-on: ubuntu-latest
+    outputs:
+      should-build: ${{ steps.check.outputs.should-build }}
+      clean-tag: ${{ steps.check.outputs.clean-tag }}
+    steps:
+      - name: Validate and process tag
+        id: check
+        run: |
+          TAG="${{ inputs.tag }}"
+          PREFIX="${{ inputs.tag-prefix }}"
+
+          # Check if tag has expected prefix
+          if [ -n "$PREFIX" ] && [[ ! "$TAG" == "$PREFIX"* ]]; then
+            echo "⚠️ Tag '$TAG' does not have expected prefix '$PREFIX'. Skipping build."
+            echo "should-build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Remove prefix if present
+          if [ -n "$PREFIX" ]; then
+            CLEAN_TAG="${TAG#"$PREFIX"}"
+          else
+            CLEAN_TAG="$TAG"
+          fi
+
+          echo "clean-tag=${CLEAN_TAG}" >> "$GITHUB_OUTPUT"
+          echo "should-build=true" >> "$GITHUB_OUTPUT"
+          echo "✅ Clean tag: ${CLEAN_TAG}"
+
+  build-and-push:
+    name: Build ${{ matrix.image.name }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: needs.prepare.outputs.should-build == 'true' && fromJson(inputs.images) != null && fromJson(inputs.images)[0] != null
+    strategy:
+      matrix:
+        image: ${{ fromJson(inputs.images) }}
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        if: contains(inputs.platforms, ',')
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Resolve Dockerfile path
+        id: paths
+        run: |
+          DOCKERFILE="${{ matrix.image.dockerfile }}"
+          if [ -n "${{ inputs.base-path }}" ]; then
+            DOCKERFILE="${{ inputs.base-path }}/${DOCKERFILE}"
+          fi
+
+          # Validate Dockerfile exists
+          if [ ! -f "$DOCKERFILE" ]; then
+            echo "❌ Error: Dockerfile not found at: $DOCKERFILE"
+            exit 1
+          fi
+
+          echo "dockerfile=$DOCKERFILE" >> "$GITHUB_OUTPUT"
+          echo "✅ Dockerfile found: $DOCKERFILE"
+
+      - name: Generate Docker metadata
+        id: meta
+        env:
+          REGISTRY: ${{ inputs.registry }}
+          REPOSITORY: ${{ inputs.repository }}
+          IMAGE_NAME: ${{ matrix.image.name }}
+          CLEAN_TAG: ${{ needs.prepare.outputs.clean-tag }}
+          ADDITIONAL_TAGS: ${{ inputs.additional-tags }}
+        run: |
+          # Primary tag
+          TAGS="${REGISTRY}/${REPOSITORY}/${IMAGE_NAME}:${CLEAN_TAG}"
+
+          # Add 'latest' tag for semantic version releases (x.y.z format)
+          if [[ "$CLEAN_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            TAGS="${TAGS},${REGISTRY}/${REPOSITORY}/${IMAGE_NAME}:latest"
+            echo "📌 Auto-adding 'latest' tag for semver release"
+          fi
+
+          # Add additional tags if specified
+          if [ -n "$ADDITIONAL_TAGS" ]; then
+            IFS=',' read -ra EXTRA_TAGS <<< "$ADDITIONAL_TAGS"
+            for extra_tag in "${EXTRA_TAGS[@]}"; do
+              extra_tag=$(echo "$extra_tag" | xargs) # trim whitespace
+              if [ -n "$extra_tag" ]; then
+                TAGS="${TAGS},${REGISTRY}/${REPOSITORY}/${IMAGE_NAME}:${extra_tag}"
+              fi
+            done
+          fi
+
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "📦 Generated tags:"
+          echo "$TAGS" | tr ',' '\n' | sed 's/^/  - /'
+
+      - name: Login to Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ secrets.registry-username }}
+          password: ${{ secrets.registry-password }}
+
+      - name: Build and push Docker image
+        id: build-push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.build-context }}
+          file: ${{ steps.paths.outputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: ${{ inputs.build-args }}
+          provenance: ${{ inputs.enable-provenance }}
+          sbom: ${{ inputs.enable-sbom }}
+
+      - name: Generate artifact attestation
+        if: inputs.enable-provenance && inputs.registry == 'ghcr.io'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ inputs.registry }}/${{ inputs.repository }}/${{ matrix.image.name }}
+          subject-digest: ${{ steps.build-push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Generate build summary
+        if: always()
+        run: |
+          {
+            echo "### 🐳 Docker Build Results: ${{ matrix.image.name }}"
+            echo ""
+            echo "**Image:** \`${{ inputs.registry }}/${{ inputs.repository }}/${{ matrix.image.name }}\`"
+            echo "**Dockerfile:** \`${{ steps.paths.outputs.dockerfile }}\`"
+            echo "**Platforms:** \`${{ inputs.platforms }}\`"
+            echo ""
+            echo "#### Tags"
+            echo "\`\`\`"
+            echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n'
+            echo "\`\`\`"
+            echo ""
+
+            if [ "${{ steps.build-push.outcome }}" = "success" ]; then
+              echo "**Status:** ✅ Build and push successful"
+              echo "**Digest:** \`${{ steps.build-push.outputs.digest }}\`"
+            else
+              echo "**Status:** ❌ Build failed"
+            fi
+
+            if [ "${{ inputs.enable-provenance }}" = "true" ]; then
+              echo "**Provenance:** ✅ Enabled"
+            fi
+            if [ "${{ inputs.enable-sbom }}" = "true" ]; then
+              echo "**SBOM:** ✅ Enabled"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
