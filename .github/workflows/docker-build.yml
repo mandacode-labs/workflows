@@ -1,21 +1,21 @@
 name: Docker Build
 
 # Reusable workflow for building and pushing Docker images to standard registries
-# Supports: Gitea Container Registry, Docker Hub, Harbor, and other OCI-compatible registries
+# Supports: GitHub Container Registry, Docker Hub, Harbor, and other OCI-compatible registries
 # For AWS ECR, use docker-build-ecr.yml instead
 #
 # Usage example:
 #   jobs:
 #     docker-build:
-#       uses: your-org/workflows/.gitea/workflows/docker-build.yml@main
+#       uses: your-org/workflows/.github/workflows/docker-build.yml@main
 #       with:
 #         images: '[{"name": "myapp", "dockerfile": "Dockerfile"}]'
-#         registry: gitea.example.com
-#         repository: ${{ gitea.repository }}
-#         tag: ${{ gitea.ref_name }}
+#         registry: ghcr.io
+#         repository: ${{ github.repository }}
+#         tag: ${{ github.ref_name }}
 #       secrets:
-#         registry-username: ${{ gitea.actor }}
-#         registry-password: ${{ secrets.GITEA_TOKEN }}
+#         registry-username: ${{ github.actor }}
+#         registry-password: ${{ secrets.GITHUB_TOKEN }}
 
 on:
   workflow_call:
@@ -35,7 +35,7 @@ on:
         type: string
         default: "."
       registry:
-        description: "Docker registry (e.g., gitea.example.com, docker.io, registry.example.com)"
+        description: "Docker registry (e.g., ghcr.io, docker.io, registry.example.com)"
         required: false
         type: string
         default: ""
@@ -108,7 +108,7 @@ jobs:
           # Check if tag has expected prefix
           if [ -n "$PREFIX" ] && [[ ! "$TAG" == "$PREFIX"* ]]; then
             echo "⚠️ Tag '$TAG' does not have expected prefix '$PREFIX'. Skipping build."
-            echo "should-build=false" >> "$GITEA_OUTPUT"
+            echo "should-build=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -119,8 +119,8 @@ jobs:
             CLEAN_TAG="$TAG"
           fi
 
-          echo "clean-tag=${CLEAN_TAG}" >> "$GITEA_OUTPUT"
-          echo "should-build=true" >> "$GITEA_OUTPUT"
+          echo "clean-tag=${CLEAN_TAG}" >> "$GITHUB_OUTPUT"
+          echo "should-build=true" >> "$GITHUB_OUTPUT"
           echo "✅ Clean tag: ${CLEAN_TAG}"
 
   build-and-push:
@@ -158,7 +158,7 @@ jobs:
             exit 1
           fi
 
-          echo "dockerfile=$DOCKERFILE" >> "$GITEA_OUTPUT"
+          echo "dockerfile=$DOCKERFILE" >> "$GITHUB_OUTPUT"
           echo "✅ Dockerfile found: $DOCKERFILE"
 
       - name: Generate Docker metadata
@@ -190,7 +190,7 @@ jobs:
             done
           fi
 
-          echo "tags=${TAGS}" >> "$GITEA_OUTPUT"
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
           echo "📦 Generated tags:"
           echo "$TAGS" | tr ',' '\n' | sed 's/^/  - /'
 
@@ -251,4 +251,4 @@ jobs:
             if [ "${{ inputs.enable-sbom }}" = "true" ]; then
               echo "**SBOM:** ✅ Enabled"
             fi
-          } >> "$GITEA_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY"

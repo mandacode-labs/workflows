@@ -6,7 +6,7 @@ name: Docker Test
 # Usage example:
 #   jobs:
 #     docker-test:
-#       uses: your-org/workflows/.gitea/workflows/docker-test.yml@main
+#       uses: your-org/workflows/.github/workflows/docker-test.yml@main
 #       with:
 #         images: '[{"dockerfile": "Dockerfile"}, {"dockerfile": "Dockerfile.alpine"}]'
 #         base-path: "build/docker"
@@ -91,7 +91,7 @@ jobs:
             exit 1
           fi
 
-          echo "dockerfile=$DOCKERFILE" >> "$GITEA_OUTPUT"
+          echo "dockerfile=$DOCKERFILE" >> "$GITHUB_OUTPUT"
           echo "✅ Dockerfile found: $DOCKERFILE"
 
       - name: Run Hadolint
@@ -119,8 +119,8 @@ jobs:
           # Generate unique tag using short SHA of dockerfile path
           DOCKERFILE="${{ steps.paths.outputs.dockerfile }}"
           SHORT_SHA=$(echo -n "$DOCKERFILE" | sha256sum | cut -c1-8)
-          echo "tag=test-${SHORT_SHA}:latest" >> "$GITEA_OUTPUT"
-          echo "tarball=/tmp/image-${SHORT_SHA}.tar" >> "$GITEA_OUTPUT"
+          echo "tag=test-${SHORT_SHA}:latest" >> "$GITHUB_OUTPUT"
+          echo "tarball=/tmp/image-${SHORT_SHA}.tar" >> "$GITHUB_OUTPUT"
           echo "✅ Generated tag: test-${SHORT_SHA}:latest (from $DOCKERFILE)"
 
       - name: Build Docker image
@@ -192,4 +192,4 @@ jobs:
               echo "- ✅ Trivy security scan"
             fi
 
-          } >> "$GITEA_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY"

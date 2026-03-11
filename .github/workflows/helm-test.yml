@@ -6,7 +6,7 @@ name: Helm Test
 # Usage example:
 #   jobs:
 #     helm-test:
-#       uses: your-org/workflows/.gitea/workflows/helm-test.yml@main
+#       uses: your-org/workflows/.github/workflows/helm-test.yml@main
 #       with:
 #         charts: '[{"dir": "charts/myapp"}]'
 #         helm-version: "v4.0.4"
@@ -85,7 +85,7 @@ jobs:
             exit 1
           fi
 
-          echo "chart-dir=$CHART_DIR" >> "$GITEA_OUTPUT"
+          echo "chart-dir=$CHART_DIR" >> "$GITHUB_OUTPUT"
           echo "✅ Chart found: $CHART_DIR"
 
       - name: Extract chart metadata
@@ -100,7 +100,7 @@ jobs:
             echo "name=$CHART_NAME"
             echo "version=$CHART_VERSION"
             echo "type=$CHART_TYPE"
-          } >> "$GITEA_OUTPUT"
+          } >> "$GITHUB_OUTPUT"
 
           echo "📦 Chart: $CHART_NAME v$CHART_VERSION (type: $CHART_TYPE)"
 
@@ -166,13 +166,13 @@ jobs:
           if [ -n "${{ inputs.base-path }}" ]; then
             CHART_DIR="${{ inputs.base-path }}/${CHART_DIR}"
           fi
-          echo "chart-dir=$CHART_DIR" >> "$GITEA_OUTPUT"
+          echo "chart-dir=$CHART_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Detect chart type
         id: meta
         run: |
           CHART_TYPE=$(yq eval '.type // "application"' "${{ steps.paths.outputs.chart-dir }}/Chart.yaml")
-          echo "type=$CHART_TYPE" >> "$GITEA_OUTPUT"
+          echo "type=$CHART_TYPE" >> "$GITHUB_OUTPUT"
 
       - name: Update dependencies
         if: steps.meta.outputs.type != 'library'
@@ -227,7 +227,7 @@ jobs:
           if [ -n "${{ inputs.base-path }}" ]; then
             CHART_DIR="${{ inputs.base-path }}/${CHART_DIR}"
           fi
-          echo "chart-dir=$CHART_DIR" >> "$GITEA_OUTPUT"
+          echo "chart-dir=$CHART_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Extract chart metadata
         id: meta
@@ -241,7 +241,7 @@ jobs:
             echo "name=$CHART_NAME"
             echo "version=$CHART_VERSION"
             echo "type=$CHART_TYPE"
-          } >> "$GITEA_OUTPUT"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Update dependencies
         if: steps.meta.outputs.type != 'library'
@@ -315,4 +315,4 @@ jobs:
             else
               echo "**Status:** ❌ Tests failed"
             fi
-          } >> "$GITEA_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY"

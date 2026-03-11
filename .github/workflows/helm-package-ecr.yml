@@ -10,7 +10,7 @@ name: Helm Package (AWS ECR)
 #       permissions:
 #         id-token: write
 #         contents: read
-#       uses: mandacode-lab/workflows/.gitea/workflows/helm-package-ecr.yml@main
+#       uses: mandacode-lab/workflows/.github/workflows/helm-package-ecr.yml@main
 #       with:
 #         charts: '[{"dir": "charts/myapp"}]'
 #         aws-region: us-east-1
@@ -128,7 +128,7 @@ jobs:
         id: get-account
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "account-id=$ACCOUNT_ID" >> "$GITEA_OUTPUT"
+          echo "account-id=$ACCOUNT_ID" >> "$GITHUB_OUTPUT"
           echo "AWS Account ID: $ACCOUNT_ID"
 
       - name: Determine ECR registry
@@ -145,7 +145,7 @@ jobs:
             REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
             echo "Using auto-detected registry: $REGISTRY"
           fi
-          echo "registry=$REGISTRY" >> "$GITEA_OUTPUT"
+          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -176,7 +176,7 @@ jobs:
             exit 1
           fi
 
-          echo "chart-dir=$CHART_DIR" >> "$GITEA_OUTPUT"
+          echo "chart-dir=$CHART_DIR" >> "$GITHUB_OUTPUT"
           echo "✅ Chart found: $CHART_DIR"
 
       - name: Extract chart metadata
@@ -193,7 +193,7 @@ jobs:
             echo "version=$CHART_VERSION"
             echo "app-version=$CHART_APP_VERSION"
             echo "type=$CHART_TYPE"
-          } >> "$GITEA_OUTPUT"
+          } >> "$GITHUB_OUTPUT"
 
           echo "📦 Chart Metadata:"
           echo "  Name: $CHART_NAME"
@@ -212,7 +212,7 @@ jobs:
           else
             ECR_REPO="${CHART_NAME}"
           fi
-          echo "repository=$ECR_REPO" >> "$GITEA_OUTPUT"
+          echo "repository=$ECR_REPO" >> "$GITHUB_OUTPUT"
           echo "📦 ECR repository: $ECR_REPO"
 
       - name: Create ECR repository if needed
@@ -280,7 +280,7 @@ jobs:
           fi
 
           PACKAGE_FILE=$(ls .helm-packages/*.tgz)
-          echo "package-file=$PACKAGE_FILE" >> "$GITEA_OUTPUT"
+          echo "package-file=$PACKAGE_FILE" >> "$GITHUB_OUTPUT"
           echo "✅ Chart packaged: $PACKAGE_FILE"
 
           ls -lh .helm-packages/
@@ -296,10 +296,10 @@ jobs:
           echo "🔍 Checking if chart version already exists..."
 
           if helm pull "oci://${REGISTRY}/${ECR_REPO}" --version "${CHART_VERSION}" --destination /tmp 2>/dev/null; then
-            echo "exists=true" >> "$GITEA_OUTPUT"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "⚠️ Chart version ${CHART_VERSION} already exists in ECR"
           else
-            echo "exists=false" >> "$GITEA_OUTPUT"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "✅ Chart version ${CHART_VERSION} does not exist, will push"
           fi
 
@@ -351,4 +351,4 @@ jobs:
             else
               echo "**Status:** ❌ Failed"
             fi
-          } >> "$GITEA_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY"
