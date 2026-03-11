@@ -1,12 +1,12 @@
-# Template: Release (Gitea Registry)
+# Template: Release (GitHub Container Registry)
 #
-# Complete release workflow to Gitea Container Registry
+# Complete release workflow to GitHub Container Registry (ghcr.io)
 # Includes: Docker build/push and Helm chart packaging
 #
 # Usage:
-#   1. Copy this file to your project's .gitea/workflows/release.yml
-#   2. Update registry URL to your Gitea instance (gitea.example.com)
-#   3. Configure GITEA_TOKEN secret with packages:write permission
+#   1. Copy this file to your project's .github/workflows/release.yml
+#   2. Configure GITHUB_TOKEN permissions (packages:write)
+#   3. Images will be pushed to ghcr.io/<owner>/<image>
 
 name: Release
 
@@ -21,7 +21,7 @@ permissions:
 jobs:
   docker-build:
     name: Build and Push Docker Images
-    uses: mandacode-lab/workflows/.gitea/workflows/docker-build.yml@main
+    uses: mandacode-lab/workflows/.github/workflows/docker-build.yml@main
     with:
       # Images to build (REQUIRED)
       images: |
@@ -35,12 +35,12 @@ jobs:
       #     {"name": "worker", "dockerfile": "services/worker/Dockerfile"}
       #   ]
 
-      # Registry configuration (REQUIRED - change to your Gitea instance)
-      registry: "gitea.example.com"
-      repository: ${{ gitea.repository }}
+      # Registry configuration (REQUIRED for GitHub)
+      registry: "ghcr.io"
+      repository: ${{ github.repository }}
 
       # Tagging
-      tag: ${{ gitea.ref_name }}
+      tag: ${{ github.ref_name }}
       tag-prefix: "v"
       # additional-tags: "latest,stable"
 
@@ -52,22 +52,22 @@ jobs:
 
       # Build arguments
       # build-args: |
-      #   VERSION=${{ gitea.ref_name }}
-      #   GIT_COMMIT=${{ gitea.sha }}
+      #   VERSION=${{ github.ref_name }}
+      #   GIT_COMMIT=${{ github.sha }}
 
       # Security attestations
       enable-provenance: false
       enable-sbom: false
 
     secrets:
-      registry-username: ${{ gitea.actor }}
-      registry-password: ${{ secrets.GITEA_TOKEN }}
+      registry-username: ${{ github.actor }}
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   # Delete this job if you don't use Helm charts
   helm-package:
     name: Package and Push Helm Charts
     needs: docker-build
-    uses: mandacode-lab/workflows/.gitea/workflows/helm-package.yml@main
+    uses: mandacode-lab/workflows/.github/workflows/helm-package.yml@main
     with:
       # Charts to package (REQUIRED)
       charts: |
@@ -76,8 +76,8 @@ jobs:
         ]
 
       # Registry configuration (REQUIRED)
-      registry: "gitea.example.com"
-      repository: ${{ gitea.repository }}
+      registry: "ghcr.io"
+      repository: ${{ github.repository }}
 
       # Options
       # base-path: ""
@@ -89,8 +89,8 @@ jobs:
       enable-provenance: false
 
     secrets:
-      registry-username: ${{ gitea.actor }}
-      registry-password: ${{ secrets.GITEA_TOKEN }}
+      registry-username: ${{ github.actor }}
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
       # GPG signing secrets (only if enable-signing: true)
       # gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
       # gpg-key-name: ${{ secrets.GPG_KEY_NAME }}

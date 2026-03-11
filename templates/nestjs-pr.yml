@@ -4,7 +4,7 @@
 # Includes: NestJS CI (lint, test, build), Docker testing, Helm chart testing
 #
 # Usage:
-#   1. Copy this file to your project's .gitea/workflows/pr.yml
+#   1. Copy this file to your project's .github/workflows/pr.yml
 #   2. Modify the options below as needed
 #   3. Remove jobs you don't need (e.g., helm-test if no charts)
 
@@ -29,7 +29,7 @@ jobs:
   # NestJS CI - Lint, Test, Build
   nest-ci:
     name: NestJS CI
-    uses: mandacode-lab/workflows/.gitea/workflows/nest-ci.yml@main
+    uses: mandacode-lab/workflows/.github/workflows/nest-ci.yml@main
     with:
       node-version: "25"
 
@@ -37,7 +37,7 @@ jobs:
   docker-test:
     name: Docker Test
     needs: nest-ci
-    uses: mandacode-lab/workflows/.gitea/workflows/docker-test.yml@main
+    uses: mandacode-lab/workflows/.github/workflows/docker-test.yml@main
     with:
       # Images to test (REQUIRED)
       images: |
@@ -68,7 +68,7 @@ jobs:
   # Delete this job if you don't use Helm charts
   helm-test:
     name: Helm Test
-    uses: mandacode-lab/workflows/.gitea/workflows/helm-test.yml@main
+    uses: mandacode-lab/workflows/.github/workflows/helm-test.yml@main
     with:
       # Charts to test (REQUIRED)
       charts: |

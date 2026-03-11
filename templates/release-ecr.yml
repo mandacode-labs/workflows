@@ -4,13 +4,13 @@
 # Includes: Docker build/push to ECR and Helm chart packaging to ECR
 #
 # Usage:
-#   1. Copy this file to your project's .gitea/workflows/release.yml
+#   1. Copy this file to your project's .github/workflows/release.yml
 #   2. Configure AWS OIDC or add AWS credentials as secrets
 #   3. Update AWS region and repository prefix
 #
 # AWS Authentication:
 #   Option 1 (Recommended): OIDC with IAM Role
-#     - Create IAM role with trust policy for Gitea OIDC
+#     - Create IAM role with trust policy for GitHub OIDC
 #     - Set aws-role-arn secret
 #   Option 2: Access Keys
 #     - Set aws-access-key-id and aws-secret-access-key secrets
@@ -28,7 +28,7 @@ permissions:
 jobs:
   docker-build-ecr:
     name: Build and Push Docker Images to ECR
-    uses: mandacode-lab/workflows/.gitea/workflows/docker-build-ecr.yml@main
+    uses: mandacode-lab/workflows/.github/workflows/docker-build-ecr.yml@main
     with:
       # Images to build (REQUIRED)
       images: |
@@ -48,7 +48,7 @@ jobs:
       ecr-repository-prefix: mycompany
 
       # Tagging
-      tag: ${{ gitea.ref_name }}
+      tag: ${{ github.ref_name }}
       tag-prefix: "v"
       # additional-tags: "latest"
 
@@ -60,8 +60,8 @@ jobs:
 
       # Build arguments
       # build-args: |
-      #   VERSION=${{ gitea.ref_name }}
-      #   GIT_COMMIT=${{ gitea.sha }}
+      #   VERSION=${{ github.ref_name }}
+      #   GIT_COMMIT=${{ github.sha }}
 
       # Security attestations
       enable-provenance: false
@@ -82,7 +82,7 @@ jobs:
   helm-package-ecr:
     name: Package and Push Helm Charts to ECR
     needs: docker-build-ecr
-    uses: mandacode-lab/workflows/.gitea/workflows/helm-package-ecr.yml@main
+    uses: mandacode-lab/workflows/.github/workflows/helm-package-ecr.yml@main
     with:
       # Charts to package (REQUIRED)
       charts: |
