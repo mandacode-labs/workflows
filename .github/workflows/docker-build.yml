@@ -98,12 +98,18 @@ jobs:
     outputs:
       should-build: ${{ steps.check.outputs.should-build }}
       clean-tag: ${{ steps.check.outputs.clean-tag }}
+      clean-registry: ${{ steps.check.outputs.clean-registry }}
     steps:
       - name: Validate and process tag
         id: check
         run: |
           TAG="${{ inputs.tag }}"
           PREFIX="${{ inputs.tag-prefix }}"
+          REGISTRY="${{ inputs.registry }}"
+
+          # Remove protocol prefix from registry if present
+          REGISTRY="${REGISTRY#https://}"
+          REGISTRY="${REGISTRY#http://}"
 
           # Check if tag has expected prefix
           if [ -n "$PREFIX" ] && [[ ! "$TAG" == "$PREFIX"* ]]; then
@@ -120,8 +126,10 @@ jobs:
           fi
 
           echo "clean-tag=${CLEAN_TAG}" >> "${GITEA_OUTPUT:-$GITHUB_OUTPUT}"
+          echo "clean-registry=${REGISTRY}" >> "${GITEA_OUTPUT:-$GITHUB_OUTPUT}"
           echo "should-build=true" >> "${GITEA_OUTPUT:-$GITHUB_OUTPUT}"
           echo "✅ Clean tag: ${CLEAN_TAG}"
+          echo "✅ Clean registry: ${REGISTRY}"
 
   build-and-push:
     name: Build ${{ matrix.image.name }}
@@ -164,7 +172,7 @@ jobs:
       - name: Generate Docker metadata
         id: meta
         env:
-          REGISTRY: ${{ inputs.registry }}
+          REGISTRY: ${{ needs.prepare.outputs.clean-registry }}
           REPOSITORY: ${{ inputs.repository }}
           IMAGE_NAME: ${{ matrix.image.name }}
           CLEAN_TAG: ${{ needs.prepare.outputs.clean-tag }}
@@ -197,7 +205,7 @@ jobs:
       - name: Login to Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ inputs.registry }}
+          registry: ${{ needs.prepare.outputs.clean-registry }}
           username: ${{ secrets.registry-username }}
           password: ${{ secrets.registry-password }}
 
@@ -215,10 +223,10 @@ jobs:
           sbom: ${{ inputs.enable-sbom }}
 
       - name: Generate artifact attestation
-        if: inputs.enable-provenance && inputs.registry == 'ghcr.io'
+        if: inputs.enable-provenance && needs.prepare.outputs.clean-registry == 'ghcr.io'
         uses: actions/attest-build-provenance@v2
         with:
-          subject-name: ${{ inputs.registry }}/${{ inputs.repository }}/${{ matrix.image.name }}
+          subject-name: ${{ needs.prepare.outputs.clean-registry }}/${{ inputs.repository }}/${{ matrix.image.name }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
           push-to-registry: true
 
@@ -228,7 +236,7 @@ jobs:
           {
             echo "### 🐳 Docker Build Results: ${{ matrix.image.name }}"
             echo ""
-            echo "**Image:** \`${{ inputs.registry }}/${{ inputs.repository }}/${{ matrix.image.name }}\`"
+            echo "**Image:** \`${{ needs.prepare.outputs.clean-registry }}/${{ inputs.repository }}/${{ matrix.image.name }}\`"
             echo "**Dockerfile:** \`${{ steps.paths.outputs.dockerfile }}\`"
             echo "**Platforms:** \`${{ inputs.platforms }}\`"
             echo ""
