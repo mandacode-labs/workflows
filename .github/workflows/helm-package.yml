@@ -240,9 +240,17 @@ jobs:
         with:
           subject-path: ${{ steps.package.outputs.package-file }}
 
-      - name: Upload chart package as artifact
-        if: always()
-        uses: actions/upload-artifact@v6
+      - name: Upload chart package as artifact (Gitea)
+        if: always() && env.GITEA_ACTIONS == 'true'
+        uses: https://gitea.com/actions/gitea-upload-artifact@v4
+        with:
+          name: helm-chart-${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}
+          path: .helm-packages/
+          retention-days: 7
+
+      - name: Upload chart package as artifact (GitHub)
+        if: always() && env.GITEA_ACTIONS != 'true'
+        uses: actions/upload-artifact@v7
         with:
           name: helm-chart-${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}
           path: .helm-packages/

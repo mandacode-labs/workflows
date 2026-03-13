@@ -167,9 +167,17 @@ jobs:
           flags: unittests
           fail_ci_if_error: false
 
-      - name: Upload coverage artifact
-        if: inputs.enable-coverage
-        uses: actions/upload-artifact@v6
+      - name: Upload coverage artifact (Gitea)
+        if: inputs.enable-coverage && env.GITEA_ACTIONS == 'true'
+        uses: https://gitea.com/actions/gitea-upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 7
+
+      - name: Upload coverage artifact (GitHub)
+        if: inputs.enable-coverage && env.GITEA_ACTIONS != 'true'
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage.out
