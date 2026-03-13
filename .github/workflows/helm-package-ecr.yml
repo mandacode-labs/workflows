@@ -321,7 +321,7 @@ jobs:
 
       - name: Upload chart package as artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: helm-chart-${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}
           path: .helm-packages/
