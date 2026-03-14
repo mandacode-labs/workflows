@@ -90,8 +90,6 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
           go-version-file: ${{ inputs.go-version-file }}
-          cache: true
-          cache-dependency-path: go.sum
 
       - name: Download dependencies
         run: go mod download
@@ -118,8 +116,6 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
           go-version-file: ${{ inputs.go-version-file }}
-          cache: true
-          cache-dependency-path: go.sum
 
       - name: Download dependencies
         run: go mod download
@@ -191,8 +187,6 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
           go-version-file: ${{ inputs.go-version-file }}
-          cache: true
-          cache-dependency-path: go.sum
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -216,8 +210,6 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
           go-version-file: ${{ inputs.go-version-file }}
-          cache: true
-          cache-dependency-path: go.sum
 
       - name: Run gosec
         uses: securego/gosec@v2.24.7
