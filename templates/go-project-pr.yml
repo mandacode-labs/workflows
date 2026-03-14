@@ -52,7 +52,6 @@ jobs:
 
       # Security
       enable-security-scan: true
-      # gosec-version: "2.22.11"
 
   # Docker Test - Lint, Security Scan, Build Verification
   docker-test:
