@@ -125,9 +125,11 @@ jobs:
             CLEAN_TAG="$TAG"
           fi
 
-          echo "clean-tag=${CLEAN_TAG}" >> "${GITEA_OUTPUT:-$GITHUB_OUTPUT}"
-          echo "clean-registry=${REGISTRY}" >> "${GITEA_OUTPUT:-$GITHUB_OUTPUT}"
-          echo "should-build=true" >> "${GITEA_OUTPUT:-$GITHUB_OUTPUT}"
+          {
+            echo "clean-tag=${CLEAN_TAG}"
+            echo "clean-registry=${REGISTRY}"
+            echo "should-build=true"
+          } >> "${GITEA_OUTPUT:-$GITHUB_OUTPUT}"
           echo "✅ Clean tag: ${CLEAN_TAG}"
           echo "✅ Clean registry: ${REGISTRY}"
 
